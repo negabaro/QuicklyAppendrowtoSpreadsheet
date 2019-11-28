@@ -1,0 +1,114 @@
+<html>
+  <head>
+    <title>memo</title>
+    <script type="text/javascript" charset="utf-8" src="/contents/js/vue.min.js"></script>
+    <script type="text/javascript" charset="utf-8" src="/contents/js/uikit.min.js"></script>
+    <script type="text/javascript" charset="utf-8" src="/contents/js/uikit-icons.min.js"></script>
+    <script type="text/javascript" charset="utf-8" src="/contents/js/popup.js" async></script>
+    <link rel="stylesheet" href="/contents/css/uikit.min.css">
+    <link rel="stylesheet" href="/contents/css/uikit-rtl.min.css">
+    <link rel="stylesheet" href="/contents/css/main.css">
+  </head>
+  <body>
+    <div id="app" class="uk-padding-small">
+      <ul uk-tab>
+        <li class="uk-active"><a href="#">post</a></li>
+        <li><a href="#">setting</a></li>
+        <li><a href="#"><span uk-icon="question"></span></a></li>
+      </ul>
+      <div uk-spinner style="position:absolute;top:9px;right:20px" v-show="isLoading"></div>
+      <ul class="uk-switcher uk-margin">
+        <li>
+          <div v-if="addedSheets.length">
+            <div class="uk-margin" uk-grid>
+              <select class="uk-select uk-width-expand" v-model="selectedSheet" >
+                <option v-for="sheet in addedSheets" v-bind:value="sheet">{{sheet.sheetName}} ({{sheet.spreadsheetName}})</option>
+              </select>
+              <div class="uk-width-auto uk-margin-auto-top uk-margin-auto-bottom uk-padding-remove" style="margin-left: 20px;margin-right: 10px;">
+                  <a :href="getSheetURL(selectedSheet)" uk-icon="link" target="_blank" uk-tooltip="
+                  Open sheet in new window"></a>
+              </div>
+              <div class="uk-width-auto uk-margin-auto-top uk-margin-auto-bottom uk-padding-remove" style="margin-right: 40px;margin-left: 20px;cursor:pointer"><span uk-icon="trash" @click="removeSheet(selectedSheet)" uk-tooltip="
+                Remove from list"></span></div>
+              
+            </div> 
+            <div class="uk-margin" v-for="column in selectedSheet.columns">
+              <label class="uk-form-label">{{column.name}}</label>
+
+              <template v-if="column.dataValidation &&column.dataValidation.criteria === 'VALUE_IN_LIST' && column.dataValidation.args[0].length > 6">
+                <select class="uk-select uk-width-expand" v-model="formData[column.name]" >
+                  <option v-for="arg in column.dataValidation.args[0]" v-bind:value="arg">{{arg}}</option>
+                </select>
+              </template>
+
+              <template v-if="column.dataValidation &&column.dataValidation.criteria === 'VALUE_IN_LIST' && column.dataValidation.args[0].length <= 6">
+                <div class="uk-margin uk-grid-small uk-child-width-auto uk-grid">
+                  <label v-for="arg in column.dataValidation.args[0]" ><input class="uk-radio" type="radio"  v-model="formData[column.name]" v-bind:value="arg"> {{arg}}</label>
+                </div>
+              </template>
+
+              <template v-if="!column.dataValidation ||column.dataValidation.criteria !== 'VALUE_IN_LIST'">
+                <div class="uk-form-controls">
+                    <input class="uk-input" type="text" placeholder="" v-model="formData[column.name]">
+                </div>
+              </template>
+
+            </div>
+            <button @click="postData()" class="uk-button uk-button-primary" :disabled="isLoading">Submit</button>
+          </div>
+        </li>
+        <li>
+          <div class="uk-margin">
+            <label class="uk-form-label" for="form-script-url">Script Current web app URL</label>
+            <div class="uk-form-controls">
+              <input class="uk-input" id="form-script-url" type="text" placeholder="https://script.google.com/macros/s/******/exec" v-model="scriptURL" style="max-width:79%">
+              <button class="uk-button uk-button-primary" @click="setScriptURL()" style="max-width:20%" :disabled="!scriptURL || !scriptURL.length">SAVE</button>
+            </div>
+          </div>
+          <hr>
+          <div class="uk-margin">
+            <label class="uk-form-label" for="form-spreadsheet-url">Spreadsheet URL</label>
+            <div class="uk-form-controls">
+              <input class="uk-input" id="form-spreadsheet-url" type="text" placeholder="https://docs.google.com/spreadsheets/d/******/edit" v-model="spreadsheetURL" style="max-width:79%">
+              <button class="uk-button uk-button-default" @click="sync()" style="max-width:20%" :disabled="!spreadsheetURL.length || !scriptURL.length || isLoading">Sync</button>
+            </div>
+          </div>
+          
+          <ul class="uk-list uk-list-divider uk-margin-small-top">
+            <li v-for="sheet in syncSheets">
+              <div style="float:left">
+                <span class="sub">{{sheet.spreadsheetName}}</span>
+                <h6 class="uk-margin-remove">{{sheet.sheetName}}</h6>
+              </div>
+              <button v-if="!sheet.added" class="uk-button uk-button-small uk-button-primary" style="float:right" @click="addSheet(sheet);sheet.disabled = true" :disabled="sheet.disabled">add</button>
+              <button v-if="sheet.added" class="uk-button uk-button-small uk-button-primary" style="float:right" @click="updateSheet(sheet);sheet.disabled = true" :disabled="sheet.disabled">update</button>
+            </li>
+          </ul>
+        </li>
+        <li class="setup">
+          <h4>Setup</h4>
+          <ol>
+            <li>Copy <a href="https://script.google.com/a/hatena.ne.jp/d/1lQRnlGtN_M8oT4QaRXXdMnE4We81QsYd6ms4c7X1uUEbjSu9M8Hv3-Cp/edit?usp=drive_web" target="_blank">this AppsScript file.</a></li>
+            <li>
+              <a href="https://developers.google.com/apps-script/guides/web#deploying_a_script_as_a_web_app" target="_blank">Deploy as web app.</a>
+            </li>
+            <li><a href="https://developers.google.com/apps-script/guides/services/authorization" target="_blank">Run the script and  granting access rights </a></li>
+            <li>Copy "Current web app URL".</li>
+            <li>Paste it in the "Script Current web app URL" of the setting tab.</li>
+            <li>Create Spreadsheet and enter column name.</li>
+            <ul>
+              <li>Special column name entered automatically input</li>
+              <ul>
+                <li>URL - current tab url</li>
+                <li>created_at - date created</li>
+              </ul>
+              <li>Register data validation (List of imtes) on the second row you can also use it on the chrome extension.</li>
+            </ul>
+            <li>Paste it in the "Spreadsheet URL" of the setting tab and click "SYNC" button.</li>
+            <li>Click "Add" button.</li>
+          </ol>
+        </li>
+      </ul>
+    </div>
+  </body>
+</html>
